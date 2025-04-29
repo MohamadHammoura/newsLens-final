@@ -1,0 +1,25 @@
+{
+    "manifest_version": 3,
+    "name": "NewsLens",
+    "version": "1.0",
+    "description": "Get sentiment and reflective AI feedback on news articles you read.",
+    "permissions": ["storage", "tabs", "scripting"],
+    "host_permissions": ["<all_urls>"],
+  
+    "background": {
+      "service_worker": "background.js"
+    },
+  
+    "action": {
+      "default_popup": "popup.html",
+      "default_title": "NewsLens"
+    },
+  
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["contentScript.js"],
+        "run_at": "document_idle"
+      }
+    ]
+  }

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NewsLens AI</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      width: 320px;
+      font-size: 14px;
+    }
+    button, select, input[type="text"] {
+      margin-top: 8px;
+      display: block;
+      width: 100%;
+      padding: 6px;
+      font-size: 14px;
+    }
+    label {
+      margin-top: 1em;
+      display: block;
+    }
+    #result {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+  <h3>🧠 NewsLens AI</h3>
+
+  <button id="analyze">🧭 Gather Perspective</button>
+  <button id="openApp">📂 Open in App</button>
+
+  <label>
+    ⏯ Detection:
+    <input type="checkbox" id="toggleDetection" /> Enable AI detection
+  </label>
+
+  <label>
+    📏 Response Length:
+    <select id="responseLength">
+      <option value="short">Short</option>
+      <option value="medium" selected>Medium</option>
+      <option value="long">Long</option>
+    </select>
+  </label>
+
+  <label>
+    📰 Add Custom News Site:
+    <form id="addSiteForm">
+      <input type="text" id="customSite" placeholder="e.g. example.com" />
+      <button type="submit">➕ Add Site</button>
+    </form>
+  </label>
+
+  <div id="result">No analysis available yet.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
