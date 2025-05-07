@@ -52,7 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.storage.local.get("lastArticle", ({ lastArticle }) => {
         if (!lastArticle) return;
         const params = new URLSearchParams(lastArticle);
-        window.open(`http://localhost:5174/analyze?${params.toString()}`, '_blank');
+          window.open(`http://localhost:5173/?${params.toString()}`, '_blank');
+
       });
     });
   });

@@ -1,4 +1,4 @@
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = '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';
 
 chrome.runtime.onMessage.addListener((request) => {
   if (request.type === 'runAnalysis') {
@@ -46,6 +46,27 @@ async function runAnalysisOnPage() {
     lastArticle: { ...article, sentiment, aiResponse, timestamp: Date.now() }
   });
 
+  // Send to backend API
+  try {
+    await fetch("http://localhost:3001/articles", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title,
+        description,
+        image,
+        url,
+        sentiment,
+        aiResponse
+      })
+    });
+    console.log("✅ Article sent to backend");
+  } catch (error) {
+    console.error("❌ Failed to send article to backend:", error);
+  }
+
   removeExistingOverlay();
   showOverlay(sentiment, aiResponse);
 }
@@ -86,7 +107,7 @@ function removeExistingOverlay() {
 }
 
 async function getSentiment(text) {
-  const prompt = `Classify the sentiment of this article as one of the following: POSITIVE, NEGATIVE, or NEUTRAL.\n\nArticle:\n"${text}"`;
+  const prompt = `Classify the sentiment of this article as one of the following: POSITIVE, NEGATIVE, or NEUTRAL. Just respond with the one word only.\n\nArticle:\n"${text}"`;
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -100,14 +121,22 @@ async function getSentiment(text) {
         { role: "system", content: "You classify the emotional tone of text as: Neutral, Positive, or Negative" },
         { role: "user", content: prompt }
       ],
-      temperature: 0.8,
-      max_tokens: 100
+      temperature: 0.5,
+      max_tokens: 10
     })
   });
 
   const result = await response.json();
-  return result.choices?.[0]?.message?.content?.trim().toUpperCase() || "NEUTRAL";
+  const raw = result.choices?.[0]?.message?.content?.trim().toUpperCase() || "NEUTRAL";
+
+  // Extract just the label if it's buried in a sentence
+  if (raw.includes("NEGATIVE")) return "NEGATIVE";
+  if (raw.includes("POSITIVE")) return "POSITIVE";
+  if (raw.includes("NEUTRAL")) return "NEUTRAL";
+
+  return "NEUTRAL"; // fallback
 }
+
 
 async function getCustomGPTResponse(text, sentiment) {
   const { responseLength = 'medium' } = await chrome.storage.local.get('responseLength');
@@ -145,5 +174,9 @@ async function getCustomGPTResponse(text, sentiment) {
   });
 
   const result = await response.json();
+
+  // 🧠 Debug log to inspect Claude's raw response
+  console.log("🧠 Claude API raw result:", result);
+
   return result.choices?.[0]?.message?.content?.trim() || "";
 }
