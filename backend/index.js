@@ -12,31 +12,26 @@ app.use(bodyParser.json());
 
 let articles = []; // In-memory store
 
-const OPENROUTER_API_KEY = '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';
+const GEMINI_API_KEY = 'AIzaSyCdM3GwuZxOvpEPEOJzXk9EP14vBvvTqWg';
 const NEWSDATA_API_KEY = 'pub_85088583de17c86ec98e77987110eeb5ea978';
 
 async function getSentiment(text) {
     const prompt = `Classify the sentiment of this article as one of the following: POSITIVE, NEGATIVE, or NEUTRAL. Just respond with the one word only.\n\nArticle:\n"${text}"`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: "POST",
         headers: {
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            model: "anthropic/claude-3-haiku",
-            messages: [
-                { role: "system", content: "You classify the emotional tone of text as: Neutral, Positive, or Negative" },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.5,
-            max_tokens: 250
+            contents: [{
+                parts: [{ text: prompt }]
+            }]
         })
     });
 
     const result = await response.json();
-    const raw = result.choices?.[0]?.message?.content?.trim().toUpperCase() || "NEUTRAL";
+    const raw = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || "NEUTRAL";
     if (raw.includes("NEGATIVE")) return "NEGATIVE";
     if (raw.includes("POSITIVE")) return "POSITIVE";
     if (raw.includes("NEUTRAL")) return "NEUTRAL";
@@ -58,26 +53,20 @@ async function getCustomGPTResponse(text, sentiment) {
             break;
     }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: "POST",
         headers: {
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            model: "anthropic/claude-3-haiku",
-            messages: [
-                { role: "system", content: "You generate thoughtful, calming, or perspective-shifting reflections on news stories." },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.8,
-            max_tokens: 400,
-            stop_sequences: []
+            contents: [{
+                parts: [{ text: prompt }]
+            }]
         })
     });
 
     const result = await response.json();
-    return result.choices?.[0]?.message?.content?.trim() || "";
+    return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 }
 
 app.post('/fetch-news', async (req, res) => {
@@ -92,7 +81,7 @@ app.post('/fetch-news', async (req, res) => {
         let addedCount = 0;
 
         for (const n of newsArticles) {
-            if (articles.some(a => a.url === n.link)) continue;
+            if (articles.some(a => a.url === n.link || a.title === n.title)) continue;
 
             const title = n.title || "";
             const description = n.description || "";
@@ -120,6 +109,11 @@ app.post('/articles', (req, res) => {
     if (!title || !url || !sentiment || !aiResponse) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    if (articles.some(a => a.url === url || a.title === title)) {
+        return res.status(409).json({ error: 'Article already exists' });
+    }
+
     const article = { title, description, image, url, sentiment, aiResponse, timestamp: Date.now() };
     articles.push(article);
     console.log("✅ New article saved:", article);

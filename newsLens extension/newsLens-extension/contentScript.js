@@ -1,4 +1,4 @@
-const OPENROUTER_API_KEY = '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';
+const GEMINI_API_KEY = 'AIzaSyCdM3GwuZxOvpEPEOJzXk9EP14vBvvTqWg';
 
 chrome.runtime.onMessage.addListener((request) => {
   if (request.type === 'runAnalysis') {
@@ -10,13 +10,45 @@ chrome.runtime.onMessage.addListener((request) => {
 
 (async function () {
   const url = window.location.href;
-  if (!/\d/.test(url)) return;
+  
+  // Check if this is likely an article page
+  const isArticlePage = isArticleUrl(url) && hasArticleContent();
+  if (!isArticlePage) return;
 
   const { detectionEnabled } = await chrome.storage.local.get(['detectionEnabled']);
   if (!detectionEnabled) return;
 
-  refreshOverlayFromStorage();
+  // Run analysis immediately
+  runAnalysisOnPage();
 })();
+
+function isArticleUrl(url) {
+  // Check for common article URL patterns
+  const articlePatterns = [
+    /\d{4}\/\d{2}\/\d{2}/, // Date pattern
+    /\/article\//,
+    /\/story\//,
+    /\/news\//,
+    /\d+$/, // Ends with number
+    /[a-z0-9-]+-[a-z0-9-]+$/ // Slug pattern
+  ];
+  
+  return articlePatterns.some(pattern => pattern.test(url));
+}
+
+function hasArticleContent() {
+  // Check for common article content indicators
+  const title = document.title;
+  const description = document.querySelector('meta[name="description"]')?.content || '';
+  const articleTag = document.querySelector('article');
+  const mainContent = document.querySelector('main');
+  
+  return (
+    title && 
+    title.length > 10 && 
+    (description || articleTag || mainContent)
+  );
+}
 
 async function refreshOverlayFromStorage() {
   const { lastArticle } = await chrome.storage.local.get(['lastArticle']);
@@ -109,25 +141,20 @@ function removeExistingOverlay() {
 async function getSentiment(text) {
   const prompt = `Classify the sentiment of this article as one of the following: POSITIVE, NEGATIVE, or NEUTRAL. Just respond with the one word only.\n\nArticle:\n"${text}"`;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "anthropic/claude-3-haiku",
-      messages: [
-        { role: "system", content: "You classify the emotional tone of text as: Neutral, Positive, or Negative" },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 10
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
     })
   });
 
   const result = await response.json();
-  const raw = result.choices?.[0]?.message?.content?.trim().toUpperCase() || "NEUTRAL";
+  const raw = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || "NEUTRAL";
 
   // Extract just the label if it's buried in a sentence
   if (raw.includes("NEGATIVE")) return "NEGATIVE";
@@ -136,7 +163,6 @@ async function getSentiment(text) {
 
   return "NEUTRAL"; // fallback
 }
-
 
 async function getCustomGPTResponse(text, sentiment) {
   const { responseLength = 'medium' } = await chrome.storage.local.get('responseLength');
@@ -156,27 +182,22 @@ async function getCustomGPTResponse(text, sentiment) {
       break;
   }
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "anthropic/claude-3-haiku",
-      messages: [
-        { role: "system", content: "You are a wise, emotionally intelligent assistant helping users emotionally process news articles." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.8,
-      max_tokens: tokenMap[responseLength] || 100
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
     })
   });
 
   const result = await response.json();
 
-  // 🧠 Debug log to inspect Claude's raw response
-  console.log("🧠 Claude API raw result:", result);
+  // 🧠 Debug log to inspect Gemini's raw response
+  console.log("🧠 Gemini API raw result:", result);
 
-  return result.choices?.[0]?.message?.content?.trim() || "";
+  return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 }
