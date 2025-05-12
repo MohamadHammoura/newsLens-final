@@ -1,6 +1,6 @@
 // background.js
 
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = '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';
 
 const NEWS_DOMAINS = [
   'cnn.com', 'bbc.com', 'nytimes.com',
@@ -30,43 +30,67 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       console.log('[NewsLens] detectionEnabled:', detectionEnabled);
 
       if (!detectionEnabled) return;
-      if (/\d/.test(tab.url)) {
-        console.log('[NewsLens] Article URL passed number check ✅');
 
-        try {
-          const [{ result: article }] = await chrome.scripting.executeScript({
-            target: { tabId },
-            func: extractArticleInfo
-          });
+      try {
+        // Check if it's an article page using content script
+        const [{ result: isArticle }] = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            const url = window.location.href;
+            const title = document.title;
+            const description = document.querySelector('meta[name="description"]')?.content || '';
+            const articleTag = document.querySelector('article');
+            const mainContent = document.querySelector('main');
+            
+            return (
+              title && 
+              title.length > 10 && 
+              (description || articleTag || mainContent)
+            );
+          }
+        });
 
-          console.log('[NewsLens] Article info extracted:', article);
-          if (!article?.title) return;
-
-          const text = `${article.title}. ${article.description}`;
-
-          console.log('[NewsLens] Sending sentiment request...');
-          const sentiment = await getSentiment(text);
-
-          console.log('[NewsLens] Sending reflection request...');
-          const aiResponse = await getCustomGPTResponse(text, sentiment);
-
-          chrome.storage.local.set({
-            lastArticle: {
-              ...article,
-              sentiment,
-              aiResponse,
-              timestamp: Date.now()
-            }
-          });
-
-          console.log('[NewsLens] Analysis saved to storage ✅');
-
-          chrome.tabs.sendMessage(tabId, { type: 'articleAnalyzed' });
-        } catch (err) {
-          console.error('[NewsLens] Error running analysis:', err);
+        if (!isArticle) {
+          console.log('[NewsLens] Not an article page, skipping analysis');
+          return;
         }
-      } else {
-        console.log('[NewsLens] Skipped (no number in URL)');
+
+        console.log('[NewsLens] Article page detected ✅');
+
+        // Extract article info
+        const [{ result: article }] = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: extractArticleInfo
+        });
+
+        if (!article?.title) {
+          console.log('[NewsLens] No article title found, skipping analysis');
+          return;
+        }
+
+        const text = `${article.title}. ${article.description}`;
+
+        console.log('[NewsLens] Sending sentiment request...');
+        const sentiment = await getSentiment(text);
+
+        console.log('[NewsLens] Sending reflection request...');
+        const aiResponse = await getCustomGPTResponse(text, sentiment);
+
+        chrome.storage.local.set({
+          lastArticle: {
+            ...article,
+            sentiment,
+            aiResponse,
+            timestamp: Date.now()
+          }
+        });
+
+        console.log('[NewsLens] Analysis saved to storage ✅');
+
+        // Notify content script to show overlay
+        chrome.tabs.sendMessage(tabId, { type: 'articleAnalyzed' });
+      } catch (err) {
+        console.error('[NewsLens] Error running analysis:', err);
       }
     });
   }

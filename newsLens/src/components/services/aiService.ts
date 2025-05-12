@@ -1,45 +1,32 @@
 // src/services/aiService.ts
 
-const HUGGINGFACE_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY;
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+const GEMINI_API_KEY = 'AIzaSyCdM3GwuZxOvpEPEOJzXk9EP14vBvvTqWg';
 
 export async function getSentiment(text: string): Promise<string> {
   const prompt = `Classify the sentiment of this article as one of the following: POSITIVE, NEGATIVE, or NEUTRAL.\n\nArticle:\n"${text}"`;
 
-  console.log('text', text
-  )
+  console.log('text', text);
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "anthropic/claude-3-haiku", // You can also try: "mistralai/mistral-7b-instruct"
-      messages: [
-        {
-          role: "system",
-          content: "You classify the emotional tone of text as: Neutral, Positive, or Negative"
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.8,
-      max_tokens: 100
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
     })
   });
 
   const result = await response.json();
   console.log("Sentiment Analysis Result:", result);
-  const content = result.choices?.[0]?.message?.content?.trim().toUpperCase() || "NEUTRAL";
+  const content = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || "NEUTRAL";
 
-  return content
+  return content;
 }
 
-// ✅ Step 2: Generate an emotional, helpful message using OpenRouter
+// ✅ Step 2: Generate an emotional, helpful message using Gemini
 export async function getCustomGPTResponse(text: string, sentiment: string): Promise<string> {
   let prompt = "";
 
@@ -58,39 +45,27 @@ export async function getCustomGPTResponse(text: string, sentiment: string): Pro
       break;
   }
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "anthropic/claude-3-haiku", // You can also try: "mistralai/mistral-7b-instruct"
-      messages: [
-        {
-          role: "system",
-          content: "You are a wise, emotionally intelligent assistant helping users emotionally process news articles with clarity, hope, or reflection."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.8,
-      max_tokens: 100
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
     })
   });
 
   const result = await response.json();
-
-  console.log("OpenRouter Response:", result);
+  console.log("Gemini Response:", result);
 
   if (result.error) {
-    console.error("OpenRouter Generation Error:", result.error);
-    
+    console.error("Gemini Generation Error:", result.error);
+    return defaultFallback(sentiment);
   }
 
-  return result.choices?.[0]?.message?.content?.trim() || defaultFallback(sentiment);
+  return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || defaultFallback(sentiment);
 }
 
 function defaultFallback(sentiment: string): string {
