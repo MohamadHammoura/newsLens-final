@@ -49,12 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
     // Open in App
     document.getElementById('openApp').addEventListener('click', () => {
-      chrome.storage.local.get("lastArticle", ({ lastArticle }) => {
-        if (!lastArticle) return;
-        const params = new URLSearchParams(lastArticle);
-          window.open(`http://localhost:5173/?${params.toString()}`, '_blank');
+        chrome.storage.local.get("lastArticle", ({ lastArticle }) => {
+            let url = "http://localhost:5173";
 
-      });
+            chrome.tabs.create({ url });
+        });
     });
-  });
+
+});
   

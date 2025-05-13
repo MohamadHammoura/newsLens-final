@@ -4,7 +4,9 @@
     "version": "1.0",
     "description": "Get sentiment and reflective AI feedback on news articles you read.",
     "permissions": ["storage", "tabs", "scripting"],
-    "host_permissions": ["<all_urls>"],
+    "host_permissions": [
+      "http://localhost:5173/*"
+    ],
   
     "background": {
       "service_worker": "background.js"
